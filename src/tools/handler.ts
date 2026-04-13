@@ -16,9 +16,17 @@ export async function handleToolCall(
   name: string,
   args: Record<string, unknown>,
   providers: Providers
-): Promise<{ content: Array<{ type: string; text: string }> }> {
-  const text = await dispatch(name, args, providers);
-  return { content: [{ type: 'text', text }] };
+): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
+  try {
+    const text = await dispatch(name, args, providers);
+    return { content: [{ type: 'text', text }] };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      content: [{ type: 'text', text: `Error: ${message}` }],
+      isError: true,
+    };
+  }
 }
 
 async function dispatch(
@@ -97,7 +105,8 @@ async function dispatch(
     }
 
     case 'get_recent_revenue': {
-      const days = typeof args.days === 'number' ? args.days : 30;
+      const rawDays = typeof args.days === 'number' ? args.days : 30;
+      const days = Math.min(Math.max(Math.floor(rawDays), 1), 365);
       const lines: string[] = [`## Revenue — last ${days} days\n`];
       let total = 0;
 

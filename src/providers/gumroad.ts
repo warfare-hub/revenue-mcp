@@ -24,7 +24,8 @@ export class GumroadProvider {
 
   private async get(path: string, params: Record<string, string> = {}): Promise<unknown> {
     const res = await axios.get(`${this.base}${path}`, {
-      params: { access_token: this.token, ...params },
+      headers: { Authorization: `Bearer ${this.token}` },
+      params,
     });
     return res.data;
   }

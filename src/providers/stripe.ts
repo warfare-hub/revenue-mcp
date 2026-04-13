@@ -29,17 +29,14 @@ export class StripeProvider {
       new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() / 1000
     );
 
-    // All active subscriptions → current MRR
-    const subscriptions = await this.client.subscriptions.list({
-      status: 'active',
-      limit: 100,
-      expand: ['data.items.data.price'],
-    });
-
     let mrr = 0;
     let activeSubscriptions = 0;
 
-    for (const sub of subscriptions.data) {
+    // Paginate through all active subscriptions
+    for await (const sub of this.client.subscriptions.list({
+      status: 'active',
+      expand: ['data.items.data.price'],
+    })) {
       for (const item of sub.items.data) {
         const price = item.price;
         if (!price.unit_amount) continue;
@@ -51,16 +48,13 @@ export class StripeProvider {
       }
     }
 
-    // New MRR this month
-    const newSubs = await this.client.subscriptions.list({
+    // New MRR this month — paginated
+    let newMrr = 0;
+    for await (const sub of this.client.subscriptions.list({
       created: { gte: startOfMonth },
       status: 'active',
-      limit: 100,
       expand: ['data.items.data.price'],
-    });
-
-    let newMrr = 0;
-    for (const sub of newSubs.data) {
+    })) {
       for (const item of sub.items.data) {
         const price = item.price;
         if (!price.unit_amount) continue;
@@ -70,19 +64,13 @@ export class StripeProvider {
       }
     }
 
-    // Churned MRR this month — list canceled subs and filter by canceled_at client-side
-    const canceledSubs = await this.client.subscriptions.list({
-      status: 'canceled',
-      limit: 100,
-      expand: ['data.items.data.price'],
-    });
-    // Filter to only subs canceled this month
-    canceledSubs.data = canceledSubs.data.filter(
-      (s) => s.canceled_at !== null && s.canceled_at !== undefined && s.canceled_at >= startOfMonth
-    );
-
+    // Churned MRR this month — filter client-side
     let churnedMrr = 0;
-    for (const sub of canceledSubs.data) {
+    for await (const sub of this.client.subscriptions.list({
+      status: 'canceled',
+      expand: ['data.items.data.price'],
+    })) {
+      if (!sub.canceled_at || sub.canceled_at < startOfMonth) continue;
       for (const item of sub.items.data) {
         const price = item.price;
         if (!price.unit_amount) continue;
@@ -104,30 +92,26 @@ export class StripeProvider {
   }
 
   async getProductBreakdown(): Promise<ProductRevenue[]> {
-    const products = await this.client.products.list({ limit: 50, active: true });
     const results: ProductRevenue[] = [];
 
-    for (const product of products.data) {
-      const prices = await this.client.prices.list({
-        product: product.id,
-        active: true,
-        type: 'recurring',
-      });
-
+    for await (const product of this.client.products.list({ active: true })) {
       let productMrr = 0;
       let subscribers = 0;
 
-      for (const price of prices.data) {
-        const subs = await this.client.subscriptions.list({
+      for await (const price of this.client.prices.list({
+        product: product.id,
+        active: true,
+        type: 'recurring',
+      })) {
+        for await (const sub of this.client.subscriptions.list({
           price: price.id,
           status: 'active',
-          limit: 100,
-        });
-        subscribers += subs.data.length;
-        if (price.unit_amount) {
-          const amount = price.unit_amount / 100;
-          const monthly = price.recurring?.interval === 'year' ? amount / 12 : amount;
-          productMrr += monthly * subs.data.length;
+        })) {
+          subscribers++;
+          if (price.unit_amount) {
+            const amount = price.unit_amount / 100;
+            productMrr += price.recurring?.interval === 'year' ? amount / 12 : amount;
+          }
         }
       }
 
@@ -144,15 +128,18 @@ export class StripeProvider {
     return results.sort((a, b) => b.mrr - a.mrr);
   }
 
-  async getRecentRevenue(days = 30): Promise<{ total: number; count: number }> {
+  async getRecentRevenue(days: number): Promise<{ total: number; count: number }> {
     const since = Math.floor((Date.now() - days * 24 * 60 * 60 * 1000) / 1000);
-    const charges = await this.client.charges.list({
-      created: { gte: since },
-      limit: 100,
-    });
-    const total = charges.data
-      .filter((c) => c.paid && !c.refunded)
-      .reduce((sum, c) => sum + c.amount / 100, 0);
-    return { total: Math.round(total * 100) / 100, count: charges.data.length };
+    let total = 0;
+    let count = 0;
+
+    for await (const charge of this.client.charges.list({ created: { gte: since } })) {
+      if (charge.paid && !charge.refunded) {
+        total += charge.amount / 100;
+        count++;
+      }
+    }
+
+    return { total: Math.round(total * 100) / 100, count };
   }
 }
