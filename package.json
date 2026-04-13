@@ -13,6 +13,12 @@
     "prepublishOnly": "npm run build"
   },
   "keywords": ["mcp", "stripe", "gumroad", "revenue", "mrr", "indie-hacker", "saas"],
+  "author": "Forgyn <hello@forgyn.com> (https://forgyn.com)",
+  "homepage": "https://forgyn.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warfare-hub/revenue-mcp"
+  },
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
