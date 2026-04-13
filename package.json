@@ -1,6 +1,6 @@
 {
   "name": "revenue-mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "mcpName": "io.github.warfare-hub/revenue-mcp",
   "description": "Revenue Dashboard MCP — query MRR, churn, and revenue from Stripe, Gumroad, Lemon Squeezy, Paddle & Polar directly in Claude",
   "main": "dist/index.js",
