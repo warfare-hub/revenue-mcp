@@ -1,7 +1,9 @@
 name: revenue-mcp
 version: 0.1.1
 description: "Query MRR, churn, and revenue from Stripe, Gumroad & Lemon Squeezy directly in Claude. No more tab-switching — ask natural language questions about your revenue."
-runtime: node
-entrypoint: dist/index.js
+runtime: typescript
+entry: dist/index.js
 build:
   command: npm run build
+startCommand:
+  type: stdio
